@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }}</title>
+  <style>
+    :root {
+      --bg: #0f172a; --card: #111827; --muted: #94a3b8; --text: #e5e7eb;
+      --border: #1f2937; --critical: #7f1d1d; --high: #991b1b;
+      --medium: #92400e; --low: #1e3a8a; --info: #334155;
+    }
+    body { margin: 0; font-family: Arial, sans-serif; background: #0b1020; color: var(--text); }
+    header { padding: 32px; background: var(--bg); border-bottom: 1px solid var(--border); }
+    main { padding: 24px 32px; }
+    h1, h2, h3 { margin-bottom: 8px; }
+    code { color: #bfdbfe; }
+    .muted { color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 12px; margin: 16px 0 24px; }
+    .grid2 { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+    .metric { font-size: 28px; font-weight: bold; }
+    .finding { border-left: 8px solid var(--info); }
+    .CRITICAL { border-left-color: var(--critical); }
+    .HIGH { border-left-color: var(--high); }
+    .MEDIUM { border-left-color: var(--medium); }
+    .LOW { border-left-color: var(--low); }
+    .INFO { border-left-color: var(--info); }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #334155; font-size: 12px; margin-right: 8px; margin-bottom: 5px; }
+    pre { white-space: pre; background: #020617; padding: 12px; border-radius: 8px; overflow: auto; max-height: 320px; border: 1px solid #1e293b; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { padding: 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { color: var(--muted); }
+    .wide-scroll { overflow-x: auto; }
+    .small { font-size: 12px; }
+    .bar-row { display: grid; grid-template-columns: minmax(130px, 260px) 1fr 90px; gap: 10px; align-items: center; margin: 7px 0; }
+    .bar-track { height: 14px; background: #020617; border-radius: 999px; border: 1px solid #1e293b; overflow: hidden; }
+    .bar { height: 100%; background: #64748b; border-radius: 999px; }
+    footer { padding: 24px 32px; border-top: 1px solid var(--border); background: var(--bg); color: var(--muted); }
+    footer a { color: #93c5fd; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>{{ title }}</h1>
+  <div class="muted">PCAP: {{ pcap }}</div>
+  {% if db_path %}<div class="muted">Evidence DB: {{ db_path }}</div>{% endif %}
+</header>
+
+<main>
+  <section>
+    <h2>Executive Summary</h2>
+    <div class="grid">
+      <div class="card"><div class="muted">Overall score</div><div class="metric">{{ score }}/100</div></div>
+      <div class="card"><div class="muted">Critical</div><div class="metric">{{ severity_counts.CRITICAL }}</div></div>
+      <div class="card"><div class="muted">High</div><div class="metric">{{ severity_counts.HIGH }}</div></div>
+      <div class="card"><div class="muted">Medium</div><div class="metric">{{ severity_counts.MEDIUM }}</div></div>
+      <div class="card"><div class="muted">Low</div><div class="metric">{{ severity_counts.LOW }}</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Capture Metadata</h2>
+    <div class="card wide-scroll">
+      <table>
+        <tbody>
+        {% for key, value in tshark_summary.capinfos.items() %}
+          {% if key in ["file_name","file_type","file_encapsulation","number_of_packets","file_size","data_size","capture_duration","earliest_packet_time","latest_packet_time","average_packet_rate","sha256"] %}
+          <tr><th>{{ key }}</th><td>{{ value }}</td></tr>
+          {% endif %}
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% if timings %}
+  <section>
+    <h2>Analysis Runtime</h2>
+    <div class="card">
+      <table>
+        <thead><tr><th>Stage</th><th>Duration</th></tr></thead>
+        <tbody>
+        {% for name, seconds in timings.items() %}
+          {% if name != "tshark_files" %}
+          <tr><td>{{ name }}</td><td>{{ human_duration(seconds) }}</td></tr>
+          {% endif %}
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+
+  <section>
+    <h2>Methodology & Reference Basis</h2>
+    <div class="card">
+      <p>This report maps observed network behavior to selected security references. These mappings are not treated as automatic compliance violations. They are evidence-based triage indicators that require environment-specific validation.</p>
+      <ul>
+        <li><strong>CIS Controls v8.1</strong> — secure configuration, network infrastructure management, network monitoring and defense.</li>
+        <li><strong>NIST SP 800-52 Rev.2</strong> — TLS protocol and secure transport guidance.</li>
+        <li><strong>NIST SP 800-81 Rev.3</strong> — secure DNS deployment, protective DNS, DNS logging and DNS tunneling indicators.</li>
+        <li><strong>NIST SP 800-41 Rev.1</strong> — firewall policy, allowed/denied traffic and scanning-related traffic considerations.</li>
+        <li><strong>MITRE ATT&CK Enterprise</strong> — adversary behavior classification such as DNS C2, discovery, remote services and exfiltration.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Network Summary</h2>
+    <div class="grid">
+      <div class="card"><div class="muted">Connections</div><div class="metric">{{ zeek_stats.connection_count }}</div></div>
+      <div class="card"><div class="muted">Internal hosts</div><div class="metric">{{ zeek_stats.internal_host_count }}</div></div>
+      <div class="card"><div class="muted">External hosts</div><div class="metric">{{ zeek_stats.external_host_count }}</div></div>
+      <div class="card"><div class="muted">DNS queries</div><div class="metric">{{ zeek_stats.dns_query_count }}</div></div>
+      <div class="card"><div class="muted">TLS sessions</div><div class="metric">{{ zeek_stats.tls_session_count }}</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>Top Services</h3>
+        {% set maxv = zeek_stats.top_services[0][1] if zeek_stats.top_services else 0 %}
+        {% for item in zeek_stats.top_services[:15] %}
+          <div class="bar-row"><code>{{ item[0] }}</code><div class="bar-track"><div class="bar" style="width: {{ bar_width(item[1], maxv) }}%"></div></div><span>{{ item[1] }}</span></div>
+        {% endfor %}
+      </div>
+      <div class="card">
+        <h3>Top Talkers</h3>
+        {% set maxv = zeek_stats.top_talkers[0][1] if zeek_stats.top_talkers else 0 %}
+        {% for item in zeek_stats.top_talkers[:15] %}
+          <div class="bar-row"><code>{{ item[0] }}</code><div class="bar-track"><div class="bar" style="width: {{ bar_width(item[1], maxv) }}%"></div></div><span>{{ item[1] }}</span></div>
+        {% endfor %}
+      </div>
+      <div class="card">
+        <h3>Top Destination Ports</h3>
+        {% set maxv = zeek_stats.top_ports[0][1] if zeek_stats.top_ports else 0 %}
+        {% for item in zeek_stats.top_ports[:15] %}
+          <div class="bar-row"><code>{{ item[0] }}</code><div class="bar-track"><div class="bar" style="width: {{ bar_width(item[1], maxv) }}%"></div></div><span>{{ item[1] }}</span></div>
+        {% endfor %}
+      </div>
+      <div class="card">
+        <h3>Protocol Hierarchy</h3>
+        {% set rows = tshark_summary.protocol_hierarchy_top %}
+        {% set maxv = rows[0].frames if rows else 0 %}
+        {% for row in rows[:15] %}
+          <div class="bar-row"><code>{{ row.protocol }}</code><div class="bar-track"><div class="bar" style="width: {{ bar_width(row.frames, maxv) }}%"></div></div><span>{{ row.frames }}</span></div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>Top Conversations by Connections</h3>
+        {% set maxv = zeek_stats.top_pairs[0][1] if zeek_stats.top_pairs else 0 %}
+        {% for item in zeek_stats.top_pairs[:12] %}
+          <div class="bar-row"><code>{{ item[0] }}</code><div class="bar-track"><div class="bar" style="width: {{ bar_width(item[1], maxv) }}%"></div></div><span>{{ item[1] }}</span></div>
+        {% endfor %}
+      </div>
+      <div class="card">
+        <h3>Top Endpoints by Bytes</h3>
+        {% set maxv = zeek_stats.top_endpoints_by_bytes[0][1] if zeek_stats.top_endpoints_by_bytes else 0 %}
+        {% for item in zeek_stats.top_endpoints_by_bytes[:12] %}
+          <div class="bar-row"><code>{{ item[0] }}</code><div class="bar-track"><div class="bar" style="width: {{ bar_width(item[1], maxv) }}%"></div></div><span>{{ item[1] | human_bytes }}</span></div>
+        {% endfor %}
+      </div>
+      <div class="card">
+        <h3>Top DNS Queries</h3>
+        {% set maxv = zeek_stats.top_dns_queries[0][1] if zeek_stats.top_dns_queries else 0 %}
+        {% for item in zeek_stats.top_dns_queries[:12] %}
+          <div class="bar-row"><code>{{ item[0] }}</code><div class="bar-track"><div class="bar" style="width: {{ bar_width(item[1], maxv) }}%"></div></div><span>{{ item[1] }}</span></div>
+        {% endfor %}
+      </div>
+      <div class="card">
+        <h3>Top HTTP Hosts / TLS SNI</h3>
+        <h4 class="muted">HTTP hosts</h4>
+        {% for item in zeek_stats.top_http_hosts[:8] %}
+          <div class="bar-row"><code>{{ item[0] }}</code><span></span><span>{{ item[1] }}</span></div>
+        {% endfor %}
+        <h4 class="muted">TLS SNI</h4>
+        {% for item in zeek_stats.top_tls_sni[:8] %}
+          <div class="bar-row"><code>{{ item[0] }}</code><span></span><span>{{ item[1] }}</span></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Findings</h2>
+    {% for finding in findings %}
+      <div class="card finding {{ finding.severity }}">
+        <h3>{{ finding.severity }} | {{ finding.title }}</h3>
+        <div>
+          <span class="badge">{{ finding.category }}</span>
+          <span class="badge">confidence: {{ finding.confidence }}</span>
+          {% if finding.data_source %}<span class="badge">{{ finding.data_source }}</span>{% endif %}
+        </div>
+        <p>{{ finding.description }}</p>
+        <p><strong>Recommendation:</strong> {{ finding.recommendation }}</p>
+        {% if finding.basis %}
+          <p><strong>Basis:</strong> {{ finding.basis }}</p>
+        {% endif %}
+        {% if finding.references %}
+          <details>
+            <summary>Reference mappings</summary>
+            <div class="wide-scroll">
+              <table>
+                <thead><tr><th>Source</th><th>Control / Section / Technique</th><th>Detail</th></tr></thead>
+                <tbody>
+                {% for ref in finding.references %}
+                  <tr>
+                    <td>{{ ref.source }}</td>
+                    <td>{{ ref.control or ref.section or ref.technique or "" }}</td>
+                    <td>{{ ref.detail }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        {% endif %}
+        {% if finding.mappings %}
+          <details>
+            <summary>Technique mappings</summary>
+            <pre>{{ finding.mappings | tojson(indent=2) }}</pre>
+          </details>
+        {% endif %}
+        {% if finding.affected_hosts %}
+          <p><strong>Affected hosts:</strong> {{ finding.affected_hosts[:30] | join(", ") }}{% if finding.affected_hosts|length > 30 %} ... (+{{ finding.affected_hosts|length - 30 }} more){% endif %}</p>
+        {% endif %}
+        {% if finding.evidence %}
+          <details>
+            <summary>Evidence summary</summary>
+            <pre>{{ finding.evidence | tojson(indent=2) }}</pre>
+          </details>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="card">No findings generated.</div>
+    {% endfor %}
+  </section>
+
+  <section>
+    <h2>Top Risky Hosts</h2>
+    <div class="card wide-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Host</th><th>Risk</th><th>Alerts</th><th>Protocols</th><th>Peers</th><th>Findings</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for host in hosts %}
+          <tr>
+            <td>{{ host.ip }}</td><td>{{ host.risk_score }}</td><td>{{ host.suricata_alerts }}</td>
+            <td>{{ host.protocols | list | sort | join(", ") }}</td><td>{{ host.peers | list | length }}</td>
+            <td>{{ host.finding_titles[:8] | join("; ") }}{% if host.finding_titles|length > 8 %} ...{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Evidence Locations</h2>
+    <div class="card">
+      <p class="muted">The report is intentionally summary-based. Full evidence is stored separately. Reference mappings use document names, controls, sections and technique IDs only; source documents are not bundled in the project.</p>
+      <ul>
+        <li><code>triage.db</code> — structured SQLite evidence store</li>
+        <li><code>findings.json</code>, <code>hosts.json</code>, <code>summary.json</code> — machine-readable summaries</li>
+        <li><code>engines/zeek/</code> — Zeek logs</li>
+        <li><code>engines/suricata/eve.json</code> — Suricata events</li>
+        <li><code>engines/tshark/</code> — compact capture/protocol summary</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Generated with <strong>IT PCAP Triage</strong> —
+  <a href="https://github.com/h0ek/it-pcap-triage" target="_blank" rel="noopener noreferrer">https://github.com/h0ek/it-pcap-triage</a>
+</footer>
+
+</body>
+</html>

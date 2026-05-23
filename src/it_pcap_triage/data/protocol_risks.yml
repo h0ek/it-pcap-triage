@@ -1,0 +1,15 @@
+ftp:
+  severity: HIGH
+  recommendation: Replace FTP with SFTP/FTPS or HTTPS-based transfer.
+telnet:
+  severity: HIGH
+  recommendation: Replace Telnet with SSH.
+llmnr:
+  severity: MEDIUM
+  recommendation: Disable LLMNR where not required.
+nbns:
+  severity: MEDIUM
+  recommendation: Disable NetBIOS name service where not required.
+smbv1:
+  severity: HIGH
+  recommendation: Disable SMBv1.

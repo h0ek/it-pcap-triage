@@ -1,0 +1,122 @@
+mappings:
+  cleartext_auth:
+    categories:
+      - "Cleartext/Auth"
+    basis: "Cleartext or weakly protected authentication/management traffic was observed in packet metadata. This is treated as a security weakness because sensitive data and administrative flows should use protected transport."
+    references:
+      - source: "CIS-Controls-v8.1"
+        control: "Control 4 / Safeguard 4.6"
+        detail: "Secure management protocols such as SSH and HTTPS; do not use insecure management protocols such as Telnet and HTTP unless operationally essential."
+      - source: "NIST-SP-800-52r2"
+        section: "TLS secure transport guidance"
+        detail: "TLS provides a protected channel for applications that transmit sensitive data, including login information."
+      - source: "CIS-Controls-v8.1"
+        control: "Control 12 / Safeguard 12.6"
+        detail: "Use secure network management and communication protocols."
+
+  insecure_protocols:
+    categories:
+      - "Legacy/Insecure Protocols"
+    basis: "Legacy or insecure protocol use was observed. The tool flags this as a hardening candidate, not automatically a confirmed vulnerability."
+    references:
+      - source: "CIS-Controls-v8.1"
+        control: "Control 4 / Safeguard 4.8"
+        detail: "Uninstall or disable unnecessary services on enterprise assets and software."
+      - source: "CIS-Controls-v8.1"
+        control: "Control 4 / Safeguard 4.6"
+        detail: "Avoid insecure management protocols unless operationally essential."
+      - source: "CIS-Controls-v8.1"
+        control: "Control 12"
+        detail: "Actively manage network infrastructure to prevent exploitation of vulnerable network services and access points."
+
+  dns:
+    categories:
+      - "DNS"
+    basis: "DNS anomalies and resolver-policy issues are mapped to secure DNS deployment and DNS monitoring guidance. High-volume or high-entropy indicators require validation."
+    references:
+      - source: "NIST-SP-800-81r3"
+        section: "2 DNS as a Component of an Organization’s Security Strategy"
+        detail: "DNS enables nearly all network communications and can be used to monitor, manage, and prevent suspicious communications."
+      - source: "NIST-SP-800-81r3"
+        section: "4.2.2 Restricting the Use of DNS With Public Providers"
+        detail: "Restrict unauthorized public DNS, DoT, DoH, and DoQ from internal networks."
+      - source: "NIST-SP-800-81r3"
+        section: "4.2.4 Detecting and Mitigating Data Exfiltration via DNS"
+        detail: "Look for larger than normal DNS volume, unusual query patterns, odd QNAMEs, entropy, and known malicious domains."
+      - source: "MITRE-ATTACK-Enterprise"
+        technique: "T1071.004"
+        detail: "DNS can be used as an application-layer protocol for command and control."
+
+  tls_web:
+    categories:
+      - "TLS/Web"
+    basis: "TLS version and certificate observations are mapped to NIST TLS implementation guidance. PCAP visibility may be limited to handshake metadata."
+    references:
+      - source: "NIST-SP-800-52r2"
+        section: "4.1 Protocol Version Support"
+        detail: "Clients should use TLS 1.2 and TLS 1.3; SSL 2.0 and SSL 3.0 should not be configured."
+      - source: "NIST-SP-800-52r2"
+        section: "Appendix F"
+        detail: "Determine the operational need for TLS 1.0 and TLS 1.1 before supporting them."
+      - source: "CIS-Controls-v8.1"
+        control: "Control 4 / Safeguard 4.6"
+        detail: "Use secure protocols such as HTTPS for management and communication."
+
+  windows_ad:
+    categories:
+      - "Windows/AD"
+    basis: "Windows authentication and SMB observations are mapped to network monitoring, secure configuration and lateral movement classification. Findings require environment-specific validation."
+    references:
+      - source: "CIS-Controls-v8.1"
+        control: "Control 13"
+        detail: "Operate processes and tooling to maintain comprehensive network monitoring and defense."
+      - source: "CIS-Controls-v8.1"
+        control: "Control 12 / Safeguard 12.2"
+        detail: "Secure network architecture should address segmentation, least privilege and availability."
+      - source: "MITRE-ATTACK-Enterprise"
+        technique: "T1021"
+        detail: "Remote services can be abused for lateral movement."
+
+  scanning_lateral:
+    categories:
+      - "Scanning/Lateral Movement"
+    basis: "High fan-out, vertical port access, or SMB spread patterns are treated as suspicious behavior candidates. They may be legitimate scanner/admin activity or malicious discovery/lateral movement."
+    references:
+      - source: "MITRE-ATTACK-Enterprise"
+        technique: "T1046"
+        detail: "Network service discovery is a common adversary behavior."
+      - source: "MITRE-ATTACK-Enterprise"
+        technique: "T1021"
+        detail: "Remote services are commonly used for lateral movement."
+      - source: "CIS-Controls-v8.1"
+        control: "Control 13"
+        detail: "Network monitoring and defense should support security-relevant correlation and analysis."
+      - source: "NIST-SP-800-41r1"
+        section: "Firewall policy / TCP UDP ICMP traffic"
+        detail: "Firewall policies should report or block traffic used to scan for hosts or perform attacks where appropriate."
+
+  suricata_ids:
+    categories:
+      - "Suricata/IDS"
+    basis: "Suricata alerts are signature/ruleset-driven indicators. They are not proof of compromise without packet/context validation."
+    references:
+      - source: "CIS-Controls-v8.1"
+        control: "Control 13 / Safeguard 13.1"
+        detail: "Centralize security event alerting across enterprise assets for log correlation and analysis."
+      - source: "MITRE-ATTACK-Enterprise"
+        detail: "Alert enrichment can map signatures to ATT&CK techniques when rule metadata or manual mappings are available."
+
+  data_movement:
+    categories:
+      - "Data Movement"
+    basis: "Large outbound data movement is treated as an investigation candidate. It may represent normal business activity, backup/cloud sync, or exfiltration."
+    references:
+      - source: "MITRE-ATTACK-Enterprise"
+        technique: "T1041"
+        detail: "Adversaries may exfiltrate data over command and control channels."
+      - source: "CIS-Controls-v8.1"
+        control: "Control 13"
+        detail: "Network monitoring and defense should support detecting suspicious network behavior."
+      - source: "NIST-SP-800-41r1"
+        section: "Firewall policy"
+        detail: "Outbound traffic policy and monitoring should be aligned with organizational requirements."

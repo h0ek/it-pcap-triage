@@ -1,0 +1,42 @@
+project:
+  name: "IT PCAP Triage"
+
+network:
+  internal_cidrs:
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
+
+  dns_servers: []
+  ntp_servers: []
+  domain_controllers: []
+  proxy_servers: []
+
+policy:
+  disallowed_protocols:
+    - telnet
+    - ftp
+    - tftp
+    - smbv1
+    - llmnr
+    - nbns
+
+  warn_on_external_dns: true
+  warn_on_tls10: true
+  warn_on_tls11: true
+  warn_on_http_auth: true
+  warn_on_ntlm: true
+
+thresholds:
+  scan_unique_hosts: 30
+  scan_unique_ports: 20
+  smb_fanout_hosts: 25
+  dns_queries_per_minute: 300
+  dns_long_label_length: 50
+  dns_entropy_threshold: 4.0
+  beacon_min_connections: 10
+  beacon_jitter_percent: 20
+  large_outbound_bytes: 104857600
+
+report:
+  top_limit: 25

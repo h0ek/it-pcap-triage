@@ -1,0 +1,20 @@
+cleartext_auth:
+  references:
+    - "CIS Controls v8.1 - Secure Configuration / Data Protection"
+    - "NIST SP 800-52 Rev.2 - TLS Guidelines"
+legacy_name_resolution:
+  references:
+    - "CIS Controls v8.1 - Network Infrastructure Management"
+    - "Microsoft security hardening guidance for LLMNR/NBNS reduction"
+dns_abuse:
+  references:
+    - "NIST SP 800-81 Rev.3 - Secure DNS Deployment Guide"
+    - "MITRE ATT&CK T1071.004 - DNS"
+windows_lateral_movement:
+  references:
+    - "MITRE ATT&CK - Lateral Movement"
+    - "CIS Controls v8.1 - Network Monitoring and Defense"
+ids_alerts:
+  references:
+    - "Suricata IDS/NSM alerts"
+    - "ET/Open or configured Suricata ruleset"

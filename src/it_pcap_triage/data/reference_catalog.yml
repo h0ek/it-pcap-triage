@@ -1,0 +1,52 @@
+sources:
+  NIST-SP-800-52r2:
+    title: "NIST SP 800-52 Rev. 2 - Guidelines for the Selection, Configuration, and Use of Transport Layer Security (TLS) Implementations"
+    type: "NIST Special Publication"
+    url: "https://doi.org/10.6028/NIST.SP.800-52r2"
+    note: "Used for TLS protocol version, certificate and secure transport guidance. The source document is not bundled with this project."
+
+  NIST-SP-800-81r3:
+    title: "NIST SP 800-81 Rev. 3 - Secure Domain Name System (DNS) Deployment Guide"
+    type: "NIST Special Publication"
+    url: "https://doi.org/10.6028/NIST.SP.800-81r3"
+    note: "Used for DNS resolver policy, protective DNS, DNS logging, encrypted DNS and DNS tunneling/data exfiltration guidance. The source document is not bundled with this project."
+
+  NIST-SP-800-41r1:
+    title: "NIST SP 800-41 Rev. 1 - Guidelines on Firewalls and Firewall Policy"
+    type: "NIST Special Publication"
+    url: "https://doi.org/10.6028/NIST.SP.800-41r1"
+    note: "Used for firewall policy, default-deny, traffic control and network perimeter policy guidance. The source document is not bundled with this project."
+
+  CIS-Controls-v8.1:
+    title: "CIS Critical Security Controls v8.1"
+    type: "CIS Controls"
+    url: "https://www.cisecurity.org/controls"
+    note: "Used as a general control mapping framework by name/control reference only. CIS source documents are not bundled with this project."
+
+  MITRE-ATTACK-Enterprise:
+    title: "MITRE ATT&CK Enterprise"
+    type: "MITRE ATT&CK"
+    url: "https://attack.mitre.org/"
+    note: "Used for adversary behavior classification such as DNS C2, discovery, scanning, lateral movement and exfiltration. The full ATT&CK STIX bundle is not bundled with this project."
+
+techniques:
+  T1071.004:
+    name: "Application Layer Protocol: DNS"
+    source: "MITRE-ATTACK-Enterprise"
+    url: "https://attack.mitre.org/techniques/T1071/004/"
+  T1046:
+    name: "Network Service Discovery"
+    source: "MITRE-ATTACK-Enterprise"
+    url: "https://attack.mitre.org/techniques/T1046/"
+  T1021:
+    name: "Remote Services"
+    source: "MITRE-ATTACK-Enterprise"
+    url: "https://attack.mitre.org/techniques/T1021/"
+  T1041:
+    name: "Exfiltration Over C2 Channel"
+    source: "MITRE-ATTACK-Enterprise"
+    url: "https://attack.mitre.org/techniques/T1041/"
+  T1095:
+    name: "Non-Application Layer Protocol"
+    source: "MITRE-ATTACK-Enterprise"
+    url: "https://attack.mitre.org/techniques/T1095/"
