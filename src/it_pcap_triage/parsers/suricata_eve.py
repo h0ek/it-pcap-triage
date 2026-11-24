@@ -7,16 +7,20 @@ from typing import Any
 
 def load_eve(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
-        return []
+        raise RuntimeError(f"Suricata output missing: {path}; check EVE logging configuration")
 
     events = []
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        if not line.strip():
-            continue
-        try:
-            events.append(json.loads(line))
-        except json.JSONDecodeError:
-            continue
+    with path.open(encoding="utf-8") as stream:
+        for number, line in enumerate(stream, 1):
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+                if not isinstance(event, dict):
+                    raise ValueError("expected JSON object")
+            except ValueError as exc:
+                raise RuntimeError(f"Invalid Suricata EVE record at line {number}: {path}") from exc
+            events.append(event)
     return events
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import json
 from pathlib import Path
 from typing import Any
 from ..utils import safe_int
@@ -26,7 +27,7 @@ def parse_capinfos(path: Path) -> dict[str, Any]:
     return data
 
 
-def parse_protocol_hierarchy(path: Path, top_limit: int = 25) -> list[dict[str, Any]]:
+def parse_protocol_hierarchy(path: Path, top_limit: int | None = 25) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
 
@@ -44,7 +45,7 @@ def parse_protocol_hierarchy(path: Path, top_limit: int = 25) -> list[dict[str, 
         # eth                                      frames:7366222 bytes:955900000
         #   ip                                    frames:7 366 bytes:955 MB
         proto_part = raw.split("frames", 1)[0].strip()
-        proto_part = proto_part.replace("|", " ").replace("`", " ").replace("-", " ").strip()
+        proto_part = proto_part.replace("|", " ").replace("`", " ").strip()
         if not proto_part:
             continue
 
@@ -76,9 +77,13 @@ def parse_protocol_hierarchy(path: Path, top_limit: int = 25) -> list[dict[str, 
 
 
 def load_tshark_summary(tshark_dir: Path, top_limit: int = 25) -> dict[str, Any]:
+    hierarchy = parse_protocol_hierarchy(tshark_dir / "protocol_hierarchy.txt", top_limit=None)
+    smb_path = tshark_dir / "smbv1.json"
     return {
+        "smbv1_activity": json.loads(smb_path.read_text(encoding="utf-8")) if smb_path.is_file() else {"count": 0, "frames": []},
+        "protocol_hierarchy": hierarchy,
         "capinfos": parse_capinfos(tshark_dir / "capinfos.txt"),
-        "protocol_hierarchy_top": parse_protocol_hierarchy(tshark_dir / "protocol_hierarchy.txt", top_limit=top_limit),
+        "protocol_hierarchy_top": hierarchy[:top_limit],
         "raw_files": {
             path.name: str(path)
             for path in sorted(tshark_dir.glob("*.txt"))

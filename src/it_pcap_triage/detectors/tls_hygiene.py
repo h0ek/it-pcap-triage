@@ -11,7 +11,10 @@ def detect_tls_hygiene(zeek: dict, eve_by_type: dict, config: dict) -> list[Find
     old_tls = []
     for row in ssl_rows:
         version = str(row.get("version", "")).lower()
-        if "tlsv10" in version or "tlsv11" in version or "ssl" in version:
+        policy = config.get("policy", {})
+        if ((version in {"tlsv10", "tlsv1", "tls1.0", "tls 1.0"} and policy.get("warn_on_tls10", True))
+                or (version in {"tlsv11", "tls1.1", "tls 1.1"} and policy.get("warn_on_tls11", True))
+                or version in {"sslv2", "sslv3", "ssl2", "ssl3"}):
             old_tls.append(row)
 
     if old_tls:

@@ -1,102 +1,59 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict, deque
+from math import isfinite
 from ..model.finding import Finding
-from ..utils import safe_int, is_ip_in_cidrs
+from ..utils import safe_float, safe_int, is_ip_in_cidrs
 
 
-def _sample_dsts(mapping: dict[str, set[str]], src: str, limit: int = 25) -> list[str]:
-    return sorted(mapping[src])[:limit]
+def _peak(events, seconds):
+    counts = Counter()
+    queue = deque()
+    best = set()
+    for ts, value in sorted(events):
+        while queue and ts - queue[0][0] >= seconds:
+            _, old = queue.popleft()
+            counts[old] -= 1
+            if not counts[old]:
+                del counts[old]
+        queue.append((ts, value))
+        counts[value] += 1
+        if len(counts) > len(best):
+            best = set(counts)
+    return best
 
 
 def detect_scanning(zeek: dict, config: dict) -> list[Finding]:
-    findings: list[Finding] = []
-    conn_rows = zeek.get("conn.log", [])
     thresholds = config.get("thresholds", {})
-    internal_cidrs = config.get("network", {}).get("internal_cidrs", [])
-
-    dst_hosts_by_src: dict[str, set[str]] = defaultdict(set)
-    dst_ports_by_src: dict[str, set[int]] = defaultdict(set)
-    smb_hosts_by_src: dict[str, set[str]] = defaultdict(set)
-
-    for row in conn_rows:
-        src = row.get("id.orig_h", "")
-        dst = row.get("id.resp_h", "")
+    window = thresholds.get("scan_window_seconds", 60)
+    if window <= 0:
+        raise ValueError("scan_window_seconds must be positive")
+    internal = config.get("network", {}).get("internal_cidrs", [])
+    horizontal, vertical, smb = defaultdict(list), defaultdict(list), defaultdict(list)
+    for row in zeek.get("conn.log", []):
+        src, dst = row.get("id.orig_h"), row.get("id.resp_h")
         port = safe_int(row.get("id.resp_p"))
-        if not src or not dst or port == 0:
+        ts = safe_float(row.get("ts"), float("nan"))
+        transport = str(row.get("proto", "tcp")).lower()
+        if not src or not dst or not port or not isfinite(ts) or transport not in {"tcp", "udp"}:
             continue
-
-        dst_hosts_by_src[src].add(dst)
-        dst_ports_by_src[src].add(port)
-
-        if port == 445 and is_ip_in_cidrs(dst, internal_cidrs):
-            smb_hosts_by_src[src].add(dst)
-
-    horizontal = [src for src, dsts in dst_hosts_by_src.items() if len(dsts) >= thresholds.get("scan_unique_hosts", 30)]
-    if horizontal:
-        evidence = {}
-        for src in horizontal[:50]:
-            evidence[src] = {
-                "source": src,
-                "unique_destination_hosts": len(dst_hosts_by_src[src]),
-                "destination_samples": _sample_dsts(dst_hosts_by_src, src),
-                "wireshark_filter": f"ip.src == {src}",
-            }
-        findings.append(Finding(
-            title="Horizontal scanning pattern observed",
-            severity="MEDIUM",
-            confidence="MEDIUM",
-            category="Scanning/Lateral Movement",
-            data_source="Zeek conn.log",
-            affected_hosts=sorted(horizontal),
-            description="One or more source hosts connected to many unique destination hosts within the capture.",
-            recommendation="Validate whether these source hosts are approved scanners, monitoring systems or management servers.",
-            evidence=evidence,
-        ))
-
-    vertical = [src for src, ports in dst_ports_by_src.items() if len(ports) >= thresholds.get("scan_unique_ports", 20)]
-    if vertical:
-        evidence = {}
-        for src in vertical[:50]:
-            evidence[src] = {
-                "source": src,
-                "unique_destination_ports": len(dst_ports_by_src[src]),
-                "destination_port_samples": sorted(dst_ports_by_src[src])[:50],
-                "wireshark_filter": f"ip.src == {src}",
-            }
-        findings.append(Finding(
-            title="Vertical port scanning pattern observed",
-            severity="MEDIUM",
-            confidence="MEDIUM",
-            category="Scanning/Lateral Movement",
-            data_source="Zeek conn.log",
-            affected_hosts=sorted(vertical),
-            description="One or more source hosts connected to many unique destination ports.",
-            recommendation="Validate whether this is approved scanning or unexpected reconnaissance.",
-            evidence=evidence,
-        ))
-
-    smb_fanout = [src for src, dsts in smb_hosts_by_src.items() if len(dsts) >= thresholds.get("smb_fanout_hosts", 25)]
-    if smb_fanout:
-        evidence = {}
-        for src in smb_fanout[:50]:
-            evidence[src] = {
-                "source": src,
-                "destination_port": 445,
-                "unique_smb_destination_hosts": len(smb_hosts_by_src[src]),
-                "destination_samples": _sample_dsts(smb_hosts_by_src, src),
-                "wireshark_filter": f"ip.src == {src} && tcp.dstport == 445",
-            }
-        findings.append(Finding(
-            title="SMB fan-out pattern observed",
-            severity="HIGH",
-            confidence="MEDIUM",
-            category="Scanning/Lateral Movement",
-            data_source="Zeek conn.log",
-            affected_hosts=sorted(smb_fanout),
-            description="One or more source hosts initiated SMB connections to many internal destination hosts. This can indicate admin activity, vulnerability scanning, software deployment or malware/ransomware-like propagation.",
-            recommendation="Validate whether affected source hosts are approved scanners or management systems. Investigate immediately if unexpected.",
-            evidence=evidence,
-        ))
-
+        horizontal[(src, port, transport)].append((ts, dst))
+        vertical[(src, dst, transport)].append((ts, port))
+        if port == 445 and transport == "tcp" and is_ip_in_cidrs(dst, internal):
+            smb[(src, port, transport)].append((ts, dst))
+    findings = []
+    for groups, key, default, title, severity in (
+        (horizontal, "scan_unique_hosts", 30, "Horizontal scanning pattern observed", "MEDIUM"),
+        (vertical, "scan_unique_ports", 20, "Vertical port scanning pattern observed", "MEDIUM"),
+        (smb, "smb_fanout_hosts", 25, "SMB fan-out pattern observed", "HIGH"),
+    ):
+        samples, hosts = [], set()
+        for (src, target, transport), events in groups.items():
+            peak = _peak(events, window)
+            if len(peak) >= thresholds.get(key, default):
+                hosts.add(src)
+                if len(samples) < 50:
+                    samples.append({"source": src, "destination" if key == "scan_unique_ports" else "destination_port": target, "transport": transport, "unique_count": len(peak), "samples": sorted(peak)[:50]})
+        if hosts:
+            findings.append(Finding(title=title, severity=severity, confidence="MEDIUM", category="Scanning/Lateral Movement", data_source="Zeek conn.log", affected_hosts=sorted(hosts), description=f"Multiple distinct targets were contacted within a rolling {window}-second window. This is a behavioral indicator, not proof of scanning.", recommendation="Validate whether activity is approved scanning, monitoring, deployment or unexpected reconnaissance.", evidence={"window_seconds": window, "groups": samples}))
     return findings

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from ipaddress import ip_address
 from ..model.finding import Finding
 from ..utils import safe_int, is_ip_in_cidrs
 
@@ -13,12 +14,21 @@ def detect_large_outbound(zeek: dict, config: dict) -> list[Finding]:
 
     sent_external = defaultdict(int)
 
+    def external(ip):
+        try:
+            addr = ip_address(ip)
+            return not is_ip_in_cidrs(ip, internal_cidrs) and not (addr.is_multicast or addr.is_unspecified or addr.is_loopback or addr.is_link_local or addr.is_reserved)
+        except ValueError:
+            return False
+
     for row in conn_rows:
         src = row.get("id.orig_h", "")
         dst = row.get("id.resp_h", "")
         bytes_sent = safe_int(row.get("orig_bytes"))
-        if src and dst and is_ip_in_cidrs(src, internal_cidrs) and not is_ip_in_cidrs(dst, internal_cidrs):
+        if src and dst and is_ip_in_cidrs(src, internal_cidrs) and external(dst):
             sent_external[src] += bytes_sent
+        elif src and dst and is_ip_in_cidrs(dst, internal_cidrs) and external(src):
+            sent_external[dst] += safe_int(row.get("resp_bytes"))
 
     large = {host: total for host, total in sent_external.items() if total >= threshold}
     if large:

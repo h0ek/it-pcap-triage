@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import math
 from collections import Counter, defaultdict
+from math import isfinite
+from ..utils import safe_float
 from ..model.finding import Finding
 from ..utils import is_ip_in_cidrs
 
@@ -29,14 +31,17 @@ def detect_dns_anomalies(zeek: dict, eve_by_type: dict, config: dict) -> list[Fi
     long_domains = []
     high_entropy = []
     nxdomain_by_host = Counter()
+    unauthorized = set()
 
     for row in dns_rows:
         src = row.get("id.orig_h", "")
         dst = row.get("id.resp_h", "")
         query = row.get("query", "")
         rcode = str(row.get("rcode_name", "")).upper()
-        if src and query:
-            queries_by_host[src].append(query)
+        timestamp = safe_float(row.get("ts"), float("nan"))
+        if src and query not in ("", "-", None) and isfinite(timestamp):
+            queries_by_host[src].append(timestamp)
+        query = query if query not in (None, "-") else ""
         if query and len(max(query.split("."), key=len, default="")) >= thresholds.get("dns_long_label_length", 50):
             long_domains.append({"src": src, "query": query})
         if query and _entropy(query.replace(".", "")) >= thresholds.get("dns_entropy_threshold", 4.0):
@@ -44,7 +49,11 @@ def detect_dns_anomalies(zeek: dict, eve_by_type: dict, config: dict) -> list[Fi
         if rcode == "NXDOMAIN":
             nxdomain_by_host[src] += 1
 
-        if allowed_dns and is_ip_in_cidrs(src, internal_cidrs) and dst and dst not in allowed_dns:
+        if (config.get("policy", {}).get("warn_on_external_dns", True)
+                and is_ip_in_cidrs(src, internal_cidrs) and dst not in ("", "-", None)
+                and (src, dst) not in unauthorized
+                and (dst not in allowed_dns if allowed_dns else not is_ip_in_cidrs(dst, internal_cidrs))):
+            unauthorized.add((src, dst))
             findings.append(Finding(
                 title="Unauthorized DNS resolver used",
                 severity="MEDIUM",
@@ -52,13 +61,22 @@ def detect_dns_anomalies(zeek: dict, eve_by_type: dict, config: dict) -> list[Fi
                 category="DNS",
                 data_source="Zeek dns.log",
                 affected_hosts=[src],
-                description=f"Internal host {src} queried DNS server {dst}, which is not in the configured allowed DNS server list.",
+                description=f"Internal host {src} queried DNS server {dst}, which is outside the configured resolver policy.",
                 recommendation="Force clients to use approved internal resolvers and block direct DNS egress where appropriate.",
                 evidence={"src": src, "dns_server": dst},
             ))
-            break
 
-    noisy_hosts = [host for host, queries in queries_by_host.items() if len(queries) >= thresholds.get("dns_queries_per_minute", 300)]
+    peaks = {}
+    for host, times in queries_by_host.items():
+        times.sort()
+        left = peak = 0
+        for right, ts in enumerate(times):
+            while ts - times[left] >= 60:
+                left += 1
+            peak = max(peak, right - left + 1)
+        if peak >= thresholds.get("dns_queries_per_minute", 300):
+            peaks[host] = peak
+    noisy_hosts = sorted(peaks)
     if noisy_hosts:
         findings.append(Finding(
             title="High DNS query volume observed",
@@ -67,9 +85,9 @@ def detect_dns_anomalies(zeek: dict, eve_by_type: dict, config: dict) -> list[Fi
             category="DNS",
             data_source="Zeek dns.log",
             affected_hosts=sorted(noisy_hosts),
-            description="One or more hosts generated high DNS query volume within the capture.",
+            description="One or more hosts generated high DNS query volume within a rolling 60-second window.",
             recommendation="Validate whether this is expected application behavior, misconfiguration, DNS brute forcing, malware, or tunneling.",
-            evidence={"hosts": sorted(noisy_hosts)[:25]},
+            evidence={"peak_queries_per_60_seconds": peaks},
         ))
 
     if long_domains or high_entropy:

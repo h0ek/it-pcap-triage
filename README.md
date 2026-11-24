@@ -21,9 +21,9 @@ PCAP
 
 ## Focus areas
 
-- cleartext protocols and exposed credentials,
+- cleartext protocols and HTTP authentication metadata,
 - legacy/insecure IT protocols,
-- SMB/NTLM/Kerberos/LDAP/Windows network risks,
+- SMBv1 commands, NTLM, Kerberos RC4 and Windows network policy indicators,
 - DNS abuse and tunneling indicators,
 - TLS and HTTP hygiene issues,
 - scanning and lateral movement patterns,
@@ -88,6 +88,14 @@ Open the report:
 ```
 xdg-open out/test-report/report.html
 ```
+
+## Analysis configuration
+
+Use a new or empty output directory for each capture. The analysis stops if a required engine fails or Suricata EVE output is missing or malformed.
+
+Pass `--config configs/default.yml` to customize the internal networks, allowed DNS/NTP/AD destinations, disallowed protocol names and detection thresholds. Empty DNS allowlists permit internal resolvers only when `warn_on_external_dns` is enabled; empty NTP/AD allowlists disable those checks. Proxy destinations are not evaluated. DNS and scanning thresholds use rolling time windows; beaconing uses connection timing and is a heuristic, not malware identification.
+
+The protocol inventory distinguishes decoded TShark layers, Zeek service names and TCP/UDP port-based candidates. Port candidates are not confirmed protocols or policy violations. SMBv1 detection excludes dialect negotiation-only frames.
 
 ## Output
 

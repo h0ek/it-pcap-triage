@@ -74,9 +74,8 @@ def cmd_analyze(args: argparse.Namespace) -> int:
             print(f"[ERROR] Suricata config not found: {suricata_cfg}", file=sys.stderr)
         return 2
 
-    config = load_config(args.config)
-
     try:
+        config = load_config(args.config)
         analyze(
             pcap=pcap,
             out_dir=out_dir,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ..model.finding import Finding
+from .insecure_protocols import service_tokens
 
 
 def detect_cleartext_auth(zeek: dict, eve_by_type: dict, config: dict) -> list[Finding]:
@@ -10,9 +11,9 @@ def detect_cleartext_auth(zeek: dict, eve_by_type: dict, config: dict) -> list[F
     auth_hosts = sorted({
         row.get("id.orig_h", "")
         for row in http_rows
-        if row.get("username") not in ("", "-", None) or "Authorization" in str(row)
+        if row.get("username") not in ("", "-", None)
     })
-    if auth_hosts:
+    if auth_hosts and config.get("policy", {}).get("warn_on_http_auth", True):
         findings.append(Finding(
             title="HTTP authentication metadata observed",
             severity="MEDIUM",
@@ -28,15 +29,13 @@ def detect_cleartext_auth(zeek: dict, eve_by_type: dict, config: dict) -> list[F
     protocols = []
     conn_rows = zeek.get("conn.log", [])
     service_map = {
-        "ftp": ("HIGH", "FTP traffic observed"),
-        "telnet": ("HIGH", "Telnet traffic observed"),
         "pop3": ("MEDIUM", "POP3 traffic observed"),
         "imap": ("MEDIUM", "IMAP traffic observed"),
         "smtp": ("LOW", "SMTP traffic observed"),
     }
 
     for service, (severity, title) in service_map.items():
-        rows = [row for row in conn_rows if service in str(row.get("service", "")).lower()]
+        rows = [row for row in conn_rows if service in service_tokens(row.get("service"))]
         if rows:
             hosts = sorted({r.get("id.orig_h", "") for r in rows if r.get("id.orig_h")})
             protocols.append(service)

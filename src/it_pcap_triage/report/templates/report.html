@@ -149,6 +149,23 @@
       </div>
     </div>
 
+    {% set inventory = tshark_summary.protocol_inventory %}
+    {% if inventory %}
+    <div class="card">
+      <h3>Protocol Inventory</h3>
+      <p>Decoded protocol layers and Zeek services are observations; port candidates are unverified. Hierarchy counts can overlap.</p>
+      <details><summary>All decoded protocols ({{ inventory.decoded|length }})</summary>
+        <ul>{% for row in inventory.decoded %}<li><code>{{ row.protocol }}</code> — {{ row.frames }} frames</li>{% endfor %}</ul>
+      </details>
+      <details><summary>Zeek services ({{ inventory.zeek_services|length }})</summary>
+        <ul>{% for row in inventory.zeek_services %}<li><code>{{ row.name }}</code> — {{ row.connections }} connections</li>{% endfor %}</ul>
+      </details>
+      <details open><summary>Port-based candidates ({{ inventory.port_candidates|length }})</summary>
+        <ul>{% for row in inventory.port_candidates %}<li>{{ row.name }} — {{ row.port }}/{{ row.transport }} — {{ row.connections }} connections</li>{% endfor %}</ul>
+      </details>
+    </div>
+    {% endif %}
+
     <div class="grid2">
       <div class="card">
         <h3>Top Conversations by Connections</h3>

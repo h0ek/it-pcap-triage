@@ -10,7 +10,6 @@ network:
   dns_servers: []
   ntp_servers: []
   domain_controllers: []
-  proxy_servers: []
 
 policy:
   disallowed_protocols:
@@ -28,6 +27,7 @@ policy:
   warn_on_ntlm: true
 
 thresholds:
+  scan_window_seconds: 60
   scan_unique_hosts: 30
   scan_unique_ports: 20
   smb_fanout_hosts: 25

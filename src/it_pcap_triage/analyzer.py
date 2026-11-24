@@ -17,6 +17,9 @@ from .detectors.windows_auth import detect_windows_auth
 from .detectors.scanning import detect_scanning
 from .detectors.suricata_alerts import detect_suricata_alerts
 from .detectors.exfiltration import detect_large_outbound
+from .detectors.beaconing import detect_beaconing
+from .detectors.network_policy import detect_network_policy
+from .protocol_inventory import protocol_inventory
 from .scoring.risk import sort_findings, build_host_profiles
 from .report.html import render_report
 from .stats import zeek_network_stats
@@ -37,6 +40,8 @@ def analyze(
 ) -> None:
     total_start = time.perf_counter()
     ensure_dir(out_dir)
+    if any(out_dir.iterdir()):
+        raise ValueError(f"Output directory must be empty: {out_dir}")
 
     logs_dir = out_dir / "logs"
     engines_dir = out_dir / "engines"
@@ -69,6 +74,7 @@ def analyze(
     eve_by_type = split_eve(eve)
     top_limit = int(config.get("report", {}).get("top_limit", 25))
     tshark_summary = load_tshark_summary(tshark_dir, top_limit=top_limit)
+    tshark_summary["protocol_inventory"] = protocol_inventory(zeek, tshark_summary)
     zeek_stats = zeek_network_stats(zeek, config=config, top_limit=top_limit)
 
     findings = []
@@ -80,14 +86,14 @@ def analyze(
     findings.extend(detect_scanning(zeek, config))
     findings.extend(detect_suricata_alerts(eve_by_type, config))
     findings.extend(detect_large_outbound(zeek, config))
+    findings.extend(detect_beaconing(zeek, config))
+    findings.extend(detect_network_policy(zeek, config))
     findings = enrich_findings_with_references(sort_findings(findings))
 
     hosts = build_host_profiles(zeek, findings, eve_by_type)
     timings["parsing_and_detection"] = time.perf_counter() - parse_start
 
     db_path = out_dir / "triage.db"
-    if db_path.exists():
-        db_path.unlink()
     store = EvidenceStore(db_path)
     store.set_meta("pcap", str(pcap))
     store.set_meta("timings", timings)
